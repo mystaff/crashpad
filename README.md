@@ -40,3 +40,67 @@ https://chromium.googlesource.com/crashpad/crashpad.
    perform automated builds and tests.
  * [crashpad-dev](https://groups.google.com/a/chromium.org/group/crashpad-dev)
    is the Crashpad developers’ mailing list.
+
+## Clone and build mystaff's Crashpad fork (HOWTO)
+
+ * Follow instruction detailed [here](https://github.com/mystaff/crashpad/blob/master/doc/developing.md).
+ 
+After getting depot_tools, you need to:
+
+ * In `depot_tools` folder you need to create `fetch_configs/crashpad_mystaff.py` with this content:
+
+```
+# Copyright 2015 The Chromium Authors. All rights reserved.
+# Use of this source code is governed by a BSD-style license that can be
+# found in the LICENSE file.
+
+import sys
+
+import config_util  # pylint: disable=import-error
+
+
+# This class doesn't need an __init__ method, so we disable the warning
+# pylint: disable=no-init
+class CrashpadMyStaffConfig(config_util.Config):
+  """Basic Config class for Timedoctor's Crashpad fork."""
+
+  @staticmethod
+  def fetch_spec(props):
+    spec = {
+      'solutions': [
+        {
+          'name': 'crashpad',
+          'url': 'https://github.com/mystaff/crashpad.git',
+          'managed': False,
+        },
+      ],
+    }
+    return {
+      'type': 'gclient_git',
+      'gclient_git_spec': spec,
+    }
+
+  @staticmethod
+  def expected_root(_props):
+    return 'crashpad'
+
+
+def main(argv=None):
+  return CrashpadMyStaffConfig().handle_args(argv)
+
+
+if __name__ == '__main__':
+  sys.exit(main(sys.argv))
+```
+ * Modify `recipes/recipe_modules/gclient/config.py` adding this
+
+```
+@config_ctx()
+def crashpad_mystaff(c):
+   soln = c.solutions.add()
+   soln.name = 'crashpad_mystaff'
+   soln.url = 'https://github.com/mystaff/crashpad.git'
+```
+
+ * After that run `fetch crashpad_mystaff`
+
