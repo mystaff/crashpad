@@ -14,9 +14,11 @@
 
 #include "handler/mac/crash_report_exception_handler.h"
 
+#include <array>
 #include <utility>
 #include <vector>
 #include <fstream>
+#include <signal.h>
 #include <sys/stat.h>
 #include <sys/types.h>
 #include <dirent.h>
@@ -43,9 +45,11 @@
 #include "util/misc/tri_state.h"
 #include "util/misc/uuid.h"
 
-
 namespace
 {
+   // Max lenght for the buffer which save console output 
+   const int kMaxBufferLength = 32;
+
    void copyMinidump(const std::string& originPath, 
                      const std::string& destPath,
                      const std::string& filename)
@@ -100,6 +104,38 @@ namespace
    {
       std::ofstream output(path);      
    }
+
+   std::string exeCmd(const char* cmd) 
+   {
+       std::array<char, kMaxBufferLength> buffer;
+       std::string result;
+       std::shared_ptr<FILE> pipe(popen(cmd, "r"), pclose);
+       if (!pipe) return std::string();
+       while (!feof(pipe.get())) {
+           if (fgets(buffer.data(), kMaxBufferLength, pipe.get()) != nullptr)
+               result += buffer.data();
+       }
+       return result;
+   }
+
+   std::vector<std::string> splitOutput(const std::string& str,
+                                         const std::string& delimiter)
+   {   
+       std::vector<std::string> strings;
+       std::string::size_type pos = 0;
+       std::string::size_type prev = 0;
+       while ((pos = str.find(delimiter, prev)) != std::string::npos)
+       {   
+           strings.push_back(str.substr(prev, pos - prev));
+           prev = pos + 1;
+       }
+      
+       if (pos == std::string::npos)
+       strings.push_back(str);
+      
+       return strings;
+    }
+
 }
 
 namespace crashpad {
@@ -251,6 +287,17 @@ kern_return_t CrashReportExceptionHandler::CatchMachException(
     if (it != process_annotations_->end() && it->second == "true" ) {
        checkDumpsFolder(process_annotations_, uuid.ToString());
        createFlagForRestartingMainApp(process_annotations_->at("TmpFilePath"));
+       // If crashed process has children kill them
+       std::string cmd = "pgrep -P " + process_annotations_->at("PidCrashed");
+       auto cmdOutput = exeCmd(cmd.c_str());
+       if (!cmdOutput.empty()) {
+          auto pids = splitOutput(cmdOutput, "\n");
+          for (auto it=pids.begin();it!=pids.end();++it) {
+              std::string::size_type sz;   // alias of size_t
+              int pid = std::stoi (*it,&sz);
+              ::kill(static_cast<pid_t>(pid), SIGKILL);
+          }
+       }
     } 
     /////////////////
 
