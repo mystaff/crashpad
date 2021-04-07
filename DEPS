@@ -25,10 +25,10 @@ vars = {
 deps = {
   'buildtools':
       Var('chromium_git') + '/chromium/src/buildtools.git@' +
-      '4164a305626786b1912d467003acf4c4995bec7d',
+      '9e121212d42be62a7cce38072f925f8398d11e49',
   'crashpad/third_party/edo/edo': {
       'url': Var('chromium_git') + '/external/github.com/google/eDistantObject.git@' +
-      '243fc89ae95b24717d41f3786f6a9abeeef87c92',
+      '6ffbf833173f53fcd06ecf08670a95cc01c01f72',
       'condition': 'checkout_ios',
   },
   'crashpad/third_party/googletest/googletest':
@@ -42,7 +42,7 @@ deps = {
       '7bde79cc274d06451bf65ae82c012a5d3e476b5a',
   'crashpad/third_party/mini_chromium/mini_chromium':
       Var('chromium_git') + '/chromium/mini_chromium@' +
-      '8ca5ea356cdb97913d62d379d503567a80d90726',
+      '329ca82f73a592d832e79334bed842fba85b9fdd',
   'crashpad/third_party/libfuzzer/src':
       Var('chromium_git') + '/chromium/llvm-project/compiler-rt/lib/fuzzer.git@' +
       'fda403cf93ecb8792cb1d061564d89a6553ca020',
@@ -76,26 +76,6 @@ deps = {
       {
         'package': 'fuchsia/clang/linux-amd64',
         'version': 'goma',
-      },
-    ],
-    'condition': 'checkout_fuchsia and host_os == "linux"',
-    'dep_type': 'cipd'
-  },
-  'crashpad/third_party/fuchsia/qemu/mac-amd64': {
-    'packages': [
-      {
-        'package': 'fuchsia/qemu/mac-amd64',
-        'version': 'latest'
-      },
-    ],
-    'condition': 'checkout_fuchsia and host_os == "mac"',
-    'dep_type': 'cipd'
-  },
-  'crashpad/third_party/fuchsia/qemu/linux-amd64': {
-    'packages': [
-      {
-        'package': 'fuchsia/qemu/linux-amd64',
-        'version': 'latest'
       },
     ],
     'condition': 'checkout_fuchsia and host_os == "linux"',

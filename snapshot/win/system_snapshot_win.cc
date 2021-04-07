@@ -23,6 +23,9 @@
 #include <utility>
 #include <vector>
 
+#include "base/check_op.h"
+#include "base/logging.h"
+#include "base/notreached.h"
 #include "base/numerics/safe_conversions.h"
 #include "base/strings/stringprintf.h"
 #include "base/strings/utf_string_conversions.h"
@@ -202,7 +205,7 @@ std::string SystemSnapshotWin::CPUVendor() const {
 
   crashpad::ScopedRegistryKey scoped_key(key);
   DWORD type;
-  wchar_t vendor_identifier[1024];
+  char16_t vendor_identifier[1024];
   DWORD vendor_identifier_size = sizeof(vendor_identifier);
 
   if (RegQueryValueEx(key,
@@ -216,9 +219,9 @@ std::string SystemSnapshotWin::CPUVendor() const {
   }
 
   std::string return_value;
-  DCHECK_EQ(vendor_identifier_size % sizeof(wchar_t), 0u);
+  DCHECK_EQ(vendor_identifier_size % sizeof(char16_t), 0u);
   base::UTF16ToUTF8(vendor_identifier,
-                    vendor_identifier_size / sizeof(wchar_t),
+                    vendor_identifier_size / sizeof(char16_t),
                     &return_value);
 
   return return_value.c_str();
@@ -407,8 +410,8 @@ void SystemSnapshotWin::TimeZone(DaylightSavingTimeStatus* dst_status,
       (time_zone_information.Bias + time_zone_information.StandardBias) * -60;
   *daylight_offset_seconds =
       (time_zone_information.Bias + time_zone_information.DaylightBias) * -60;
-  *standard_name = base::UTF16ToUTF8(time_zone_information.StandardName);
-  *daylight_name = base::UTF16ToUTF8(time_zone_information.DaylightName);
+  *standard_name = base::WideToUTF8(time_zone_information.StandardName);
+  *daylight_name = base::WideToUTF8(time_zone_information.DaylightName);
 }
 
 }  // namespace internal
