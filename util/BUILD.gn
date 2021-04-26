@@ -83,7 +83,9 @@ if (crashpad_is_mac || crashpad_is_ios) {
           migcom_path,
         ]
       }
-      deps = [ "//build/config/mac:sdk_inputs" ]
+      if (crashpad_is_mac) {
+        deps = [ "//build/config/mac:sdk_inputs" ]
+      }
     }
     if (sysroot != "") {
       if (crashpad_is_in_chromium) {
@@ -387,7 +389,7 @@ crashpad_static_library("util") {
 
   deps = []
 
-  if (crashpad_is_linux || crashpad_is_fuchsia || crashpad_is_android) {
+  if (crashpad_http_transport_impl == "socket") {
     sources += [ "net/http_transport_socket.cc" ]
     if (crashpad_use_boringssl_for_http_transport_socket) {
       defines += [ "CRASHPAD_USE_BORINGSSL" ]
@@ -400,6 +402,12 @@ crashpad_static_library("util") {
           "ssl",
         ]
       }
+    }
+  } else if (crashpad_http_transport_impl == "libcurl") {
+    sources += [ "net/http_transport_libcurl.cc" ]
+    if (crashpad_is_in_fuchsia) {
+      # Host Linux builds in Fuchsia don't have libcurl in a sysroot.
+      deps += [ "//third_party/curl:libcurl" ]
     }
   }
 
