@@ -211,3 +211,4 @@ crashpad_install_dev(DIRECTORY build
     DESTINATION "${CMAKE_INSTALL_INCLUDEDIR}/crashpad/mini_chromium"
     FILES_MATCHING PATTERN "*.h"
 )
+
