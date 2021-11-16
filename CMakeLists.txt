@@ -123,6 +123,7 @@ add_subdirectory(handler)
 
 if(CRASHPAD_ENABLE_STACKTRACE AND APPLE AND NOT IOS)
     set(LIBUNWIND_ENABLE_SHARED OFF)
+    set(LIBUNWIND_ENABLE_CROSS_UNWINDING ON)
     add_subdirectory(libunwind)
     crashpad_install_target(unwind_static)
 endif()
