@@ -269,6 +269,8 @@ kern_return_t CrashReportExceptionHandler::CatchMachException(
   ExcServerCopyState(
       behavior, old_state, old_state_count, new_state, new_state_count);
 
+  td::KillChildProcesses(std::to_string(pid));
+
   Metrics::ExceptionCaptureResult(Metrics::CaptureResult::kSuccess);
   return ExcServerSuccessfulReturnValue(exception, behavior, false);
 }

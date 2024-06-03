@@ -64,26 +64,6 @@ std::string getChildProcessList(const std::string& ppid) {
   return result;
 }
 
-void killCrashedPidChildren(const std::string& pid) {
-  // if crashed process has children kill them
-  auto cmdOutput = getChildProcessList(pid);
-  if (!cmdOutput.empty()) {
-    std::istringstream stream(cmdOutput);
-    for (std::string line; std::getline(stream, line);) {
-      if (!line.empty()) {
-#if defined(WIN32)
-        const auto explorer = OpenProcess(PROCESS_TERMINATE, false, stoul(line));
-        TerminateProcess(explorer, 1);
-        CloseHandle(explorer);
-#else
-        int pid = std::stoi(line);
-        ::kill(static_cast<pid_t>(pid), SIGKILL);
-#endif
-      }
-    }
-  }
-}
-
 std::vector<char*> getRelaunchArgv(const std::string& argvStr,
                                    const std::string& pidCrashed,
                                    bool& maybeCrashLoop) {
@@ -164,6 +144,25 @@ void SetCrashed() {
   crashed = true;
 }
 
+void KillChildProcesses(const std::string& pid) {
+  auto cmdOutput = getChildProcessList(pid);
+  if (!cmdOutput.empty()) {
+    std::istringstream stream(cmdOutput);
+    for (std::string line; std::getline(stream, line);) {
+      if (!line.empty()) {
+#if defined(WIN32)
+        const auto explorer = OpenProcess(PROCESS_TERMINATE, false, stoul(line));
+        TerminateProcess(explorer, 1);
+        CloseHandle(explorer);
+#else
+        int pid = std::stoi(line);
+        ::kill(static_cast<pid_t>(pid), SIGKILL);
+#endif
+      }
+    }
+  }
+}
+
 void RelaunchOnCrash(const std::map<std::string, std::string>& annotations) {
   if (crashed) {
     auto appPath = annotations.find("__td-relaunch-path");
@@ -182,7 +181,7 @@ void RelaunchOnCrash(const std::map<std::string, std::string>& annotations) {
                 << appPath->second.c_str() << " (" << pidCrashed->second.c_str()
                 << ") maybeCrashLoop=" << maybeCrashLoop << " ARGS=" << argvStr;
 
-      killCrashedPidChildren(pidCrashed->second);
+      KillChildProcesses(pidCrashed->second);
 
       if (!maybeCrashLoop) {
 #if defined(WIN32)
