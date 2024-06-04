@@ -7,6 +7,8 @@
 namespace td {
   void SetCrashed();
 
+  void KillChildProcesses(const std::string& pid);
+
   void RelaunchOnCrash(const std::map<std::string, std::string>& annotations);
 }
 
