@@ -1,15 +1,11 @@
 if(CRASHPAD_ZLIB_SYSTEM)
     add_library(crashpad_zlib INTERFACE)
-    string(REPLACE ";" "$<SEMICOLON>" GENEX_ZLIB_LIBRARIES "${ZLIB_LIBRARIES}")
-    target_include_directories(crashpad_zlib INTERFACE
-        $<BUILD_INTERFACE:${ZLIB_INCLUDE_DIRS}>
-    )
     target_compile_definitions(crashpad_zlib INTERFACE
         ZLIB_CONST
         CRASHPAD_ZLIB_SOURCE_SYSTEM
         $<BUILD_INTERFACE:${ZLIB_COMPILE_DEFINITIONS}>
     )
-    target_link_libraries(crashpad_zlib INTERFACE $<BUILD_INTERFACE:${GENEX_ZLIB_LIBRARIES}>)
+    target_link_libraries(crashpad_zlib INTERFACE ZLIB::ZLIB)
 else()
     add_library(crashpad_zlib STATIC
         zlib/adler32.c
@@ -31,7 +27,6 @@ else()
         zlib/inflate.h
         zlib/inftrees.c
         zlib/inftrees.h
-        zlib/names.h
         zlib/trees.c
         zlib/trees.h
         zlib/uncompr.c
@@ -50,16 +45,11 @@ else()
     if(archs MATCHES "(x86_64)|(x86)|(i[3-7]86)|(AMD64)")
         target_sources(crashpad_zlib PRIVATE
             zlib/crc_folding.c
-            zlib/fill_window_sse.c
-            zlib/x86.c
-            zlib/x86.h
         )
 
         if(NOT MSVC)
             target_compile_options(crashpad_zlib PRIVATE -msse4.2 -mpclmul)
         endif()
-    else()
-        target_sources(crashpad_zlib PRIVATE zlib/simd_stub.c)
     endif()
     target_compile_definitions(crashpad_zlib PUBLIC
         CRASHPAD_ZLIB_SOURCE_EMBEDDED

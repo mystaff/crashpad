@@ -1,4 +1,4 @@
-// Copyright 2014 The Crashpad Authors. All rights reserved.
+// Copyright 2014 The Crashpad Authors
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -19,7 +19,6 @@
 #include <string>
 
 #include "base/files/file_path.h"
-#include "base/macros.h"
 #include "util/net/http_headers.h"
 
 namespace crashpad {
@@ -35,6 +34,9 @@ class HTTPBodyStream;
 //! request that is appropriate for the host operating system.
 class HTTPTransport {
  public:
+  HTTPTransport(const HTTPTransport&) = delete;
+  HTTPTransport& operator=(const HTTPTransport&) = delete;
+
   virtual ~HTTPTransport();
 
   //! \brief Instantiates a concrete HTTPTransport class for the current
@@ -47,6 +49,11 @@ class HTTPTransport {
   //!
   //! \param[in] url The request URL.
   void SetURL(const std::string& url);
+
+  //! \brief Sets the optional HTTP proxy through which to send the request
+  //!
+  //! \param[in] http_proxy the fully specified URL
+  void SetHTTPProxy(const std::string& http_proxy);
 
   //! \brief Sets the HTTP method to execute. E.g., GET, POST, etc. The default
   //!     method is `"POST"`.
@@ -97,6 +104,7 @@ class HTTPTransport {
   HTTPTransport();
 
   const std::string& url() const { return url_; }
+  const std::string& http_proxy() const { return http_proxy_; }
   const std::string& method() const { return method_; }
   const HTTPHeaders& headers() const { return headers_; }
   HTTPBodyStream* body_stream() const { return body_stream_.get(); }
@@ -107,13 +115,12 @@ class HTTPTransport {
 
  private:
   std::string url_;
+  std::string http_proxy_;
   std::string method_;
   base::FilePath root_ca_certificate_path_;
   HTTPHeaders headers_;
   std::unique_ptr<HTTPBodyStream> body_stream_;
   double timeout_;
-
-  DISALLOW_COPY_AND_ASSIGN(HTTPTransport);
 };
 
 }  // namespace crashpad

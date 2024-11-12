@@ -64,6 +64,7 @@ target_link_libraries(crashpad_handler_lib
 
 if(WIN32)
     if(MSVC)
+        target_link_libraries(crashpad_handler_lib PUBLIC crashpad_getopt)
         target_compile_options(crashpad_handler_lib PRIVATE "/wd4201")
     endif()
 endif()
@@ -118,6 +119,32 @@ if(NOT IOS)
     add_executable(crashpad::handler ALIAS crashpad_handler)
 
     install(TARGETS crashpad_handler EXPORT crashpad_export
+        RUNTIME DESTINATION "${CMAKE_INSTALL_BINDIR}"
+    )
+endif()
+
+if (WIN32)
+    add_library(crashpad_wer SHARED
+        win/wer/crashpad_wer.cc
+        win/wer/crashpad_wer.h
+        win/wer/crashpad_wer.def
+        win/wer/crashpad_wer_main.cc
+        ../util/misc/address_types.h
+        ../util/win/address_types.h
+        ../util/win/registration_protocol_win.h
+    )
+
+    target_link_libraries(crashpad_wer
+        PRIVATE
+            $<BUILD_INTERFACE:crashpad_interface>
+            $<BUILD_INTERFACE:crashpad_compat>
+    )
+
+    set_property(TARGET crashpad_wer PROPERTY EXPORT_NAME crashpad_wer)
+    set_property(TARGET crashpad_wer PROPERTY PREFIX "") # ensure MINGW doesn't prefix "lib" to dll name
+    add_library(crashpad::wer ALIAS crashpad_wer)
+
+    install(TARGETS crashpad_wer EXPORT crashpad_export
         RUNTIME DESTINATION "${CMAKE_INSTALL_BINDIR}"
     )
 endif()

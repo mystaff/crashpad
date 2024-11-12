@@ -1,4 +1,4 @@
-// Copyright 2021 The Crashpad Authors. All rights reserved.
+// Copyright 2021 The Crashpad Authors
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -18,7 +18,6 @@
 #include <map>
 #include <memory>
 
-#include "base/macros.h"
 #include "util/ios/ios_intermediate_dump_format.h"
 #include "util/ios/ios_intermediate_dump_object.h"
 
@@ -34,6 +33,10 @@ class IOSIntermediateDumpData;
 class IOSIntermediateDumpMap : public IOSIntermediateDumpObject {
  public:
   IOSIntermediateDumpMap();
+
+  IOSIntermediateDumpMap(const IOSIntermediateDumpMap&) = delete;
+  IOSIntermediateDumpMap& operator=(const IOSIntermediateDumpMap&) = delete;
+
   ~IOSIntermediateDumpMap() override;
 
   // IOSIntermediateDumpObject:
@@ -60,8 +63,6 @@ class IOSIntermediateDumpMap : public IOSIntermediateDumpObject {
   friend class IOSIntermediateDumpReader;
   std::map<IntermediateDumpKey, std::unique_ptr<IOSIntermediateDumpObject>>
       map_;
-
-  DISALLOW_COPY_AND_ASSIGN(IOSIntermediateDumpMap);
 };
 
 }  // namespace internal

@@ -1,4 +1,4 @@
-// Copyright 2014 The Crashpad Authors. All rights reserved.
+// Copyright 2014 The Crashpad Authors
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -17,6 +17,7 @@
 #include <algorithm>
 #include <limits>
 
+#include "base/check_op.h"
 #include "base/files/file_path.h"
 #include "base/logging.h"
 #include "base/notreached.h"
@@ -229,7 +230,7 @@ FileOffset LoggingSeekFile(FileHandle file, FileOffset offset, int whence) {
       method = FILE_END;
       break;
     default:
-      NOTREACHED();
+      NOTREACHED_IN_MIGRATION();
       break;
   }
 
@@ -282,7 +283,7 @@ FileHandle StdioFileHandle(StdioStream stdio_stream) {
       standard_handle = STD_ERROR_HANDLE;
       break;
     default:
-      NOTREACHED();
+      NOTREACHED_IN_MIGRATION();
       return INVALID_HANDLE_VALUE;
   }
 

@@ -15,7 +15,10 @@ mc_append_sources(
     check.h
     check_op.h
     compiler_specific.h
-    cxx17_backports.h
+    containers/checked_iterators.h
+    containers/dynamic_extent.h
+    containers/span.h
+    containers/util.h
     debug/alias.cc
     debug/alias.h
     files/file_path.cc
@@ -24,16 +27,19 @@ mc_append_sources(
     files/scoped_file.cc
     files/scoped_file.h
     format_macros.h
+    immediate_crash.h
     logging.cc
     logging.h
-    macros.h
     memory/free_deleter.h
     memory/page_size.h
+    memory/raw_ptr_exclusion.h
     memory/scoped_policy.h
     metrics/histogram_functions.h
     metrics/histogram_macros.h
     metrics/persistent_histogram_allocator.h
     notreached.h
+    numerics/basic_ops_impl.h
+    numerics/byte_conversions.h
     numerics/checked_math.h
     numerics/checked_math_impl.h
     numerics/clamped_math.h
@@ -51,6 +57,11 @@ mc_append_sources(
     rand_util.h
     scoped_clear_last_error.h
     scoped_generic.h
+    strings/pattern.cc
+    strings/pattern.h
+    strings/strcat.cc
+    strings/strcat.h
+    strings/strcat_internal.h
     strings/string_number_conversions.cc
     strings/string_number_conversions.h
     strings/string_piece.h
@@ -71,6 +82,8 @@ mc_append_sources(
     third_party/icu/icu_utf.h
     threading/thread_local_storage.cc
     threading/thread_local_storage.h
+    types/cxx23_to_underlying.h
+    types/to_address.h
 )
 
 if(NOT MINGW)
@@ -83,43 +96,30 @@ else()
     )
 endif()
 
-if(APPLE AND NOT IOS)
+if(APPLE)
     mc_append_sources(
-        mac/close_nocancel.cc
-        mac/foundation_util.h
-        mac/foundation_util.mm
-        mac/mach_logging.cc
-        mac/mach_logging.h
-        mac/scoped_cftyperef.h
-        mac/scoped_ioobject.h
-        mac/scoped_launch_data.h
-        mac/scoped_mach_port.cc
-        mac/scoped_mach_port.h
-        mac/scoped_mach_vm.cc
-        mac/scoped_mach_vm.h
-        mac/scoped_nsautorelease_pool.h
-        mac/scoped_nsautorelease_pool.mm
-        mac/scoped_nsobject.h
-        mac/scoped_typeref.h
+        apple/bridging.h
+        apple/foundation_util.h
+        apple/foundation_util.mm
+        apple/mach_logging.cc
+        apple/mach_logging.h
+        apple/scoped_cftyperef.h
+        apple/scoped_mach_port.cc
+        apple/scoped_mach_port.h
+        apple/scoped_mach_vm.cc
+        apple/scoped_mach_vm.h
+        apple/scoped_nsautorelease_pool.h
+        apple/scoped_nsautorelease_pool.mm
+        apple/scoped_typeref.h
         strings/sys_string_conversions_mac.mm
     )
-elseif(IOS)
-    mc_append_sources(
-        mac/foundation_util.h
-        mac/foundation_util.mm
-        mac/mach_logging.cc
-        mac/mach_logging.h
-        mac/scoped_cftyperef.h
-        mac/scoped_mach_port.cc
-        mac/scoped_mach_port.h
-        mac/scoped_mach_vm.cc
-        mac/scoped_mach_vm.h
-        mac/scoped_nsautorelease_pool.h
-        mac/scoped_nsautorelease_pool.mm
-        mac/scoped_nsobject.h
-        mac/scoped_typeref.h
-        strings/sys_string_conversions_mac.mm
-    )
+    if (NOT IOS)
+        mc_append_sources(
+            mac/close_nocancel.cc
+            mac/scoped_ioobject.h
+            mac/scoped_launch_data.h
+        )
+    endif()
 endif()
 
 if(WIN32)
@@ -145,6 +145,12 @@ else()
     )
 endif()
 
+if(APPLE)
+    target_compile_options(mini_chromium
+        PUBLIC "-fobjc-arc" "-fno-objc-arc-exceptions"
+        PRIVATE "-Wno-deprecated-declarations"
+    )
+endif()
 if(APPLE AND NOT IOS)
     target_link_libraries(mini_chromium PUBLIC
         "-framework ApplicationServices"
@@ -182,7 +188,11 @@ target_link_libraries(mini_chromium
 if(WIN32)
     target_link_libraries(mini_chromium PRIVATE advapi32 kernel32)
     if(MSVC)
-        target_compile_options(mini_chromium PRIVATE "/wd4201" "/wd4996")
+        target_compile_options(mini_chromium PRIVATE
+            $<$<COMPILE_LANGUAGE:C,CXX>:/wd4201> # nonstandard extension used : nameless struct/union.
+            $<$<COMPILE_LANGUAGE:C,CXX>:/wd4244> # conversion from '__int64' to 'int32_t', possible loss of data.
+            $<$<COMPILE_LANGUAGE:C,CXX>:/wd4996> # 'X' was declared deprecated.
+        )
         target_compile_definitions(mini_chromium PRIVATE
             NOMINMAX
             UNICODE

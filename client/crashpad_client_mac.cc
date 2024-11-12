@@ -1,4 +1,4 @@
-// Copyright 2014 The Crashpad Authors. All rights reserved.
+// Copyright 2014 The Crashpad Authors
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -21,10 +21,12 @@
 #include <stdint.h>
 
 #include <memory>
+#include <tuple>
 #include <utility>
 
+#include "base/apple/mach_logging.h"
+#include "base/check_op.h"
 #include "base/logging.h"
-#include "base/mac/mach_logging.h"
 #include "base/strings/stringprintf.h"
 #include "util/mac/mac_util.h"
 #include "util/mach/bootstrap.h"
@@ -35,7 +37,7 @@
 #include "util/mach/notify_server.h"
 #include "util/misc/clock.h"
 #include "util/misc/implicit_cast.h"
-#include "util/posix/double_fork_and_exec.h"
+#include "util/posix/spawn_subprocess.h"
 
 namespace crashpad {
 
@@ -94,6 +96,9 @@ class ScopedPthreadAttrDestroy {
       : pthread_attr_(pthread_attr) {
   }
 
+  ScopedPthreadAttrDestroy(const ScopedPthreadAttrDestroy&) = delete;
+  ScopedPthreadAttrDestroy& operator=(const ScopedPthreadAttrDestroy&) = delete;
+
   ~ScopedPthreadAttrDestroy() {
     errno = pthread_attr_destroy(pthread_attr_);
     PLOG_IF(WARNING, errno != 0) << "pthread_attr_destroy";
@@ -101,13 +106,14 @@ class ScopedPthreadAttrDestroy {
 
  private:
   pthread_attr_t* pthread_attr_;
-
-  DISALLOW_COPY_AND_ASSIGN(ScopedPthreadAttrDestroy);
 };
 
 //! \brief Starts a Crashpad handler, possibly restarting it if it dies.
 class HandlerStarter final : public NotifyServer::DefaultInterface {
  public:
+  HandlerStarter(const HandlerStarter&) = delete;
+  HandlerStarter& operator=(const HandlerStarter&) = delete;
+
   ~HandlerStarter() {}
 
   //! \brief Starts a Crashpad handler initially, as opposed to starting it for
@@ -117,19 +123,20 @@ class HandlerStarter final : public NotifyServer::DefaultInterface {
   //!
   //! \return On success, a send right to the Crashpad handler that has been
   //!     started. On failure, `MACH_PORT_NULL` with a message logged.
-  static base::mac::ScopedMachSendRight InitialStart(
+  static base::apple::ScopedMachSendRight InitialStart(
       const base::FilePath& handler,
       const base::FilePath& database,
       const base::FilePath& metrics_dir,
       const std::string& url,
+      const std::string& http_proxy,
       const std::map<std::string, std::string>& annotations,
       const std::vector<std::string>& arguments,
       const std::vector<base::FilePath>& attachments,
       bool restartable) {
-    base::mac::ScopedMachReceiveRight receive_right(
+    base::apple::ScopedMachReceiveRight receive_right(
         NewMachPort(MACH_PORT_RIGHT_RECEIVE));
     if (!receive_right.is_valid()) {
-      return base::mac::ScopedMachSendRight();
+      return base::apple::ScopedMachSendRight();
     }
 
     mach_port_t port;
@@ -141,9 +148,9 @@ class HandlerStarter final : public NotifyServer::DefaultInterface {
                                                &right_type);
     if (kr != KERN_SUCCESS) {
       MACH_LOG(ERROR, kr) << "mach_port_extract_right";
-      return base::mac::ScopedMachSendRight();
+      return base::apple::ScopedMachSendRight();
     }
-    base::mac::ScopedMachSendRight send_right(port);
+    base::apple::ScopedMachSendRight send_right(port);
     DCHECK_EQ(port, receive_right.get());
     DCHECK_EQ(right_type,
               implicit_cast<mach_msg_type_name_t>(MACH_MSG_TYPE_PORT_SEND));
@@ -162,20 +169,27 @@ class HandlerStarter final : public NotifyServer::DefaultInterface {
                      database,
                      metrics_dir,
                      url,
+                     http_proxy,
                      annotations,
                      arguments,
                      attachments,
                      std::move(receive_right),
                      handler_restarter.get(),
                      false)) {
-      return base::mac::ScopedMachSendRight();
+      return base::apple::ScopedMachSendRight();
     }
 
     if (handler_restarter &&
-        handler_restarter->StartRestartThread(
-            handler, database, metrics_dir, url, annotations, arguments, attachments)) {
+        handler_restarter->StartRestartThread(handler,
+                                              database,
+                                              metrics_dir,
+                                              url,
+                                              http_proxy,
+                                              annotations,
+                                              arguments,
+                                              attachments)) {
       // The thread owns the object now.
-      ignore_result(handler_restarter.release());
+      std::ignore = handler_restarter.release();
     }
 
     // If StartRestartThread() failed, proceed without the ability to restart.
@@ -206,10 +220,11 @@ class HandlerStarter final : public NotifyServer::DefaultInterface {
                 database_,
                 metrics_dir_,
                 url_,
+                http_proxy_,
                 annotations_,
                 arguments_,
                 attachments_,
-                base::mac::ScopedMachReceiveRight(rights),
+                base::apple::ScopedMachReceiveRight(rights),
                 this,
                 true);
 
@@ -253,10 +268,11 @@ class HandlerStarter final : public NotifyServer::DefaultInterface {
                           const base::FilePath& database,
                           const base::FilePath& metrics_dir,
                           const std::string& url,
+                          const std::string& http_proxy,
                           const std::map<std::string, std::string>& annotations,
                           const std::vector<std::string>& arguments,
                           const std::vector<base::FilePath>& attachments,
-                          base::mac::ScopedMachReceiveRight receive_right,
+                          base::apple::ScopedMachReceiveRight receive_right,
                           HandlerStarter* handler_restarter,
                           bool restart) {
     DCHECK(!restart || handler_restarter);
@@ -282,7 +298,7 @@ class HandlerStarter final : public NotifyServer::DefaultInterface {
         // port-destroyed notifications can be delivered.
         handler_restarter->notify_port_.reset();
       } else {
-        base::mac::ScopedMachSendRight previous_owner(previous);
+        base::apple::ScopedMachSendRight previous_owner(previous);
         DCHECK(restart || !previous_owner.is_valid());
       }
 
@@ -332,6 +348,9 @@ class HandlerStarter final : public NotifyServer::DefaultInterface {
     if (!url.empty()) {
       argv.push_back(FormatArgumentString("url", url));
     }
+    if (!http_proxy.empty()) {
+      argv.push_back(FormatArgumentString("http-proxy", http_proxy));
+    }
     for (const auto& kv : annotations) {
       argv.push_back(
           FormatArgumentString("annotation", kv.first + '=' + kv.second));
@@ -348,7 +367,7 @@ class HandlerStarter final : public NotifyServer::DefaultInterface {
     // this parent process, which was probably using the exception server now
     // being restarted. The handler can’t monitor itself for its own crashes via
     // this interface.
-    if (!DoubleForkAndExec(
+    if (!SpawnSubprocess(
             argv,
             nullptr,
             server_write_fd.get(),
@@ -367,7 +386,7 @@ class HandlerStarter final : public NotifyServer::DefaultInterface {
       return false;
     }
 
-    ignore_result(receive_right.release());
+    std::ignore = receive_right.release();
     return true;
   }
 
@@ -375,6 +394,7 @@ class HandlerStarter final : public NotifyServer::DefaultInterface {
                           const base::FilePath& database,
                           const base::FilePath& metrics_dir,
                           const std::string& url,
+                          const std::string& http_proxy,
                           const std::map<std::string, std::string>& annotations,
                           const std::vector<std::string>& arguments,
                           const std::vector<base::FilePath>& attachments) {
@@ -382,6 +402,7 @@ class HandlerStarter final : public NotifyServer::DefaultInterface {
     database_ = database;
     metrics_dir_ = metrics_dir;
     url_ = url;
+    http_proxy_ = http_proxy;
     annotations_ = annotations;
     arguments_ = arguments;
     attachments_ = attachments;
@@ -435,13 +456,12 @@ class HandlerStarter final : public NotifyServer::DefaultInterface {
   base::FilePath database_;
   base::FilePath metrics_dir_;
   std::string url_;
+  std::string http_proxy_;
   std::map<std::string, std::string> annotations_;
   std::vector<std::string> arguments_;
   std::vector<base::FilePath> attachments_;
-  base::mac::ScopedMachReceiveRight notify_port_;
+  base::apple::ScopedMachReceiveRight notify_port_;
   uint64_t last_start_time_;
-
-  DISALLOW_COPY_AND_ASSIGN(HandlerStarter);
 };
 
 }  // namespace
@@ -457,6 +477,7 @@ bool CrashpadClient::StartHandler(
     const base::FilePath& database,
     const base::FilePath& metrics_dir,
     const std::string& url,
+    const std::string& http_proxy,
     const std::map<std::string, std::string>& annotations,
     const std::vector<std::string>& arguments,
     bool restartable,
@@ -465,11 +486,12 @@ bool CrashpadClient::StartHandler(
   // The “restartable” behavior can only be selected on OS X 10.10 and later. In
   // previous OS versions, if the initial client were to crash while attempting
   // to restart the handler, it would become an unkillable process.
-  base::mac::ScopedMachSendRight exception_port(HandlerStarter::InitialStart(
+  base::apple::ScopedMachSendRight exception_port(HandlerStarter::InitialStart(
       handler,
       database,
       metrics_dir,
       url,
+      http_proxy,
       annotations,
       arguments,
       attachments,
@@ -484,7 +506,8 @@ bool CrashpadClient::StartHandler(
 }
 
 bool CrashpadClient::SetHandlerMachService(const std::string& service_name) {
-  base::mac::ScopedMachSendRight exception_port(BootstrapLookUp(service_name));
+  base::apple::ScopedMachSendRight exception_port(
+      BootstrapLookUp(service_name));
   if (!exception_port.is_valid()) {
     return false;
   }
@@ -494,7 +517,7 @@ bool CrashpadClient::SetHandlerMachService(const std::string& service_name) {
 }
 
 bool CrashpadClient::SetHandlerMachPort(
-    base::mac::ScopedMachSendRight exception_port) {
+    base::apple::ScopedMachSendRight exception_port) {
   DCHECK(!exception_port_.is_valid());
   DCHECK(exception_port.is_valid());
 
@@ -506,7 +529,7 @@ bool CrashpadClient::SetHandlerMachPort(
   return true;
 }
 
-base::mac::ScopedMachSendRight CrashpadClient::GetHandlerMachPort() const {
+base::apple::ScopedMachSendRight CrashpadClient::GetHandlerMachPort() const {
   DCHECK(exception_port_.is_valid());
 
   // For the purposes of this method, only return a port set by
@@ -527,16 +550,16 @@ base::mac::ScopedMachSendRight CrashpadClient::GetHandlerMachPort() const {
       mach_task_self(), exception_port_.get(), MACH_PORT_RIGHT_SEND, 1);
   if (kr != KERN_SUCCESS) {
     MACH_LOG(ERROR, kr) << "mach_port_mod_refs";
-    return base::mac::ScopedMachSendRight(MACH_PORT_NULL);
+    return base::apple::ScopedMachSendRight(MACH_PORT_NULL);
   }
 
-  return base::mac::ScopedMachSendRight(exception_port_.get());
+  return base::apple::ScopedMachSendRight(exception_port_.get());
 }
 
 // static
 void CrashpadClient::UseSystemDefaultHandler() {
-  base::mac::ScopedMachSendRight
-      system_crash_reporter_handler(SystemCrashReporterHandler());
+  base::apple::ScopedMachSendRight system_crash_reporter_handler(
+      SystemCrashReporterHandler());
 
   // Proceed even if SystemCrashReporterHandler() failed, setting MACH_PORT_NULL
   // to clear the current exception ports.
