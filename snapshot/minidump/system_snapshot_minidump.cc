@@ -1,4 +1,4 @@
-// Copyright 2018 The Crashpad Authors. All rights reserved.
+// Copyright 2018 The Crashpad Authors
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -68,6 +68,8 @@ CPUArchitecture SystemSnapshotMinidump::GetCPUArchitecture() const {
     case kMinidumpCPUArchitectureMIPS:
       return kCPUArchitectureMIPSEL;
     // No word on how MIPS64 is signalled
+    case kMinidumpCPUArchitectureRISCV64Breakpad:
+      return kCPUArchitectureRISCV64;
 
     default:
       return CPUArchitecture::kCPUArchitectureUnknown;
@@ -98,36 +100,36 @@ std::string SystemSnapshotMinidump::CPUVendor() const {
 void SystemSnapshotMinidump::CPUFrequency(uint64_t* current_hz,
                                           uint64_t* max_hz) const {
   INITIALIZATION_STATE_DCHECK_VALID(initialized_);
-  NOTREACHED();  // https://crashpad.chromium.org/bug/10
+  NOTREACHED_IN_MIGRATION();  // https://crashpad.chromium.org/bug/10
 }
 
 uint32_t SystemSnapshotMinidump::CPUX86Signature() const {
   INITIALIZATION_STATE_DCHECK_VALID(initialized_);
-  NOTREACHED();  // https://crashpad.chromium.org/bug/10
+  NOTREACHED_IN_MIGRATION();  // https://crashpad.chromium.org/bug/10
   return 0;
 }
 
 uint64_t SystemSnapshotMinidump::CPUX86Features() const {
   INITIALIZATION_STATE_DCHECK_VALID(initialized_);
-  NOTREACHED();  // https://crashpad.chromium.org/bug/10
+  NOTREACHED_IN_MIGRATION();  // https://crashpad.chromium.org/bug/10
   return 0;
 }
 
 uint64_t SystemSnapshotMinidump::CPUX86ExtendedFeatures() const {
   INITIALIZATION_STATE_DCHECK_VALID(initialized_);
-  NOTREACHED();  // https://crashpad.chromium.org/bug/10
+  NOTREACHED_IN_MIGRATION();  // https://crashpad.chromium.org/bug/10
   return 0;
 }
 
 uint32_t SystemSnapshotMinidump::CPUX86Leaf7Features() const {
   INITIALIZATION_STATE_DCHECK_VALID(initialized_);
-  NOTREACHED();  // https://crashpad.chromium.org/bug/10
+  NOTREACHED_IN_MIGRATION();  // https://crashpad.chromium.org/bug/10
   return 0;
 }
 
 bool SystemSnapshotMinidump::CPUX86SupportsDAZ() const {
   INITIALIZATION_STATE_DCHECK_VALID(initialized_);
-  NOTREACHED();  // https://crashpad.chromium.org/bug/10
+  NOTREACHED_IN_MIGRATION();  // https://crashpad.chromium.org/bug/10
   return false;
 }
 
@@ -176,13 +178,13 @@ std::string SystemSnapshotMinidump::OSVersionFull() const {
 
 std::string SystemSnapshotMinidump::MachineDescription() const {
   INITIALIZATION_STATE_DCHECK_VALID(initialized_);
-  NOTREACHED();  // https://crashpad.chromium.org/bug/10
+  NOTREACHED_IN_MIGRATION();  // https://crashpad.chromium.org/bug/10
   return std::string();
 }
 
 bool SystemSnapshotMinidump::NXEnabled() const {
   INITIALIZATION_STATE_DCHECK_VALID(initialized_);
-  NOTREACHED();  // https://crashpad.chromium.org/bug/10
+  NOTREACHED_IN_MIGRATION();  // https://crashpad.chromium.org/bug/10
   return false;
 }
 
@@ -192,7 +194,13 @@ void SystemSnapshotMinidump::TimeZone(DaylightSavingTimeStatus* dst_status,
                                       std::string* standard_name,
                                       std::string* daylight_name) const {
   INITIALIZATION_STATE_DCHECK_VALID(initialized_);
-  NOTREACHED();  // https://crashpad.chromium.org/bug/10
+  NOTREACHED_IN_MIGRATION();  // https://crashpad.chromium.org/bug/10
+}
+
+uint64_t SystemSnapshotMinidump::AddressMask() const {
+  INITIALIZATION_STATE_DCHECK_VALID(initialized_);
+  NOTREACHED_IN_MIGRATION();  // https://crashpad.chromium.org/bug/10
+  return 0;
 }
 
 }  // namespace internal

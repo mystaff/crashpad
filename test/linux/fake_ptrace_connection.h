@@ -1,4 +1,4 @@
-// Copyright 2017 The Crashpad Authors. All rights reserved.
+// Copyright 2017 The Crashpad Authors
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -20,7 +20,6 @@
 #include <memory>
 #include <set>
 
-#include "base/macros.h"
 #include "util/linux/ptrace_connection.h"
 #include "util/misc/initialization_state_dcheck.h"
 #include "util/process/process_memory_linux.h"
@@ -35,6 +34,10 @@ namespace test {
 class FakePtraceConnection : public PtraceConnection {
  public:
   FakePtraceConnection();
+
+  FakePtraceConnection(const FakePtraceConnection&) = delete;
+  FakePtraceConnection& operator=(const FakePtraceConnection&) = delete;
+
   ~FakePtraceConnection();
 
   //! \brief Initializes this connection for the process whose process ID is
@@ -60,7 +63,7 @@ class FakePtraceConnection : public PtraceConnection {
 
   //! \brief Attempts to create a ProcessMemory when called, calling
   //!     ADD_FAILURE() and returning `nullptr` on failure.
-  ProcessMemory* Memory() override;
+  ProcessMemoryLinux* Memory() override;
 
   //! \todo Not yet implemented.
   bool Threads(std::vector<pid_t>* threads) override;
@@ -74,8 +77,6 @@ class FakePtraceConnection : public PtraceConnection {
   pid_t pid_;
   bool is_64_bit_;
   InitializationStateDcheck initialized_;
-
-  DISALLOW_COPY_AND_ASSIGN(FakePtraceConnection);
 };
 
 }  // namespace test

@@ -1,4 +1,4 @@
-// Copyright 2017 The Crashpad Authors. All rights reserved.
+// Copyright 2017 The Crashpad Authors
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -40,6 +40,10 @@ namespace {
 class ScopedTimeoutThread : public Thread {
  public:
   ScopedTimeoutThread() : join_sem_(0) {}
+
+  ScopedTimeoutThread(const ScopedTimeoutThread&) = delete;
+  ScopedTimeoutThread& operator=(const ScopedTimeoutThread&) = delete;
+
   ~ScopedTimeoutThread() { EXPECT_TRUE(JoinWithTimeout(5.0)); }
 
  protected:
@@ -55,14 +59,15 @@ class ScopedTimeoutThread : public Thread {
   }
 
   Semaphore join_sem_;
-
-  DISALLOW_COPY_AND_ASSIGN(ScopedTimeoutThread);
 };
 
 class RunBrokerThread : public ScopedTimeoutThread {
  public:
   RunBrokerThread(PtraceBroker* broker)
       : ScopedTimeoutThread(), broker_(broker) {}
+
+  RunBrokerThread(const RunBrokerThread&) = delete;
+  RunBrokerThread& operator=(const RunBrokerThread&) = delete;
 
   ~RunBrokerThread() {}
 
@@ -73,14 +78,15 @@ class RunBrokerThread : public ScopedTimeoutThread {
   }
 
   PtraceBroker* broker_;
-
-  DISALLOW_COPY_AND_ASSIGN(RunBrokerThread);
 };
 
 class BlockOnReadThread : public ScopedTimeoutThread {
  public:
   BlockOnReadThread(int readfd, int writefd)
       : ScopedTimeoutThread(), readfd_(readfd), writefd_(writefd) {}
+
+  BlockOnReadThread(const BlockOnReadThread&) = delete;
+  BlockOnReadThread& operator=(const BlockOnReadThread&) = delete;
 
   ~BlockOnReadThread() {}
 
@@ -98,13 +104,15 @@ class BlockOnReadThread : public ScopedTimeoutThread {
 
   int readfd_;
   int writefd_;
-
-  DISALLOW_COPY_AND_ASSIGN(BlockOnReadThread);
 };
 
 class SameBitnessTest : public Multiprocess {
  public:
   SameBitnessTest() : Multiprocess(), mapping_() {}
+
+  SameBitnessTest(const SameBitnessTest&) = delete;
+  SameBitnessTest& operator=(const SameBitnessTest&) = delete;
+
   ~SameBitnessTest() {}
 
  protected:
@@ -267,11 +275,12 @@ class SameBitnessTest : public Multiprocess {
   }
 
   ScopedMmap mapping_;
-
-  DISALLOW_COPY_AND_ASSIGN(SameBitnessTest);
 };
 
-TEST(PtraceBroker, SameBitness) {
+// TODO(https://crbug.com/1459865): This test consistently fails on ASAN/LSAN
+// but it's not clear if this test is correct in the general case (see comment 2
+// on that issue).
+TEST(PtraceBroker, DISABLED_SameBitness) {
   SameBitnessTest test;
   test.Run();
 }

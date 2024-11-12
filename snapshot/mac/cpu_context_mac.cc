@@ -1,4 +1,4 @@
-// Copyright 2014 The Crashpad Authors. All rights reserved.
+// Copyright 2014 The Crashpad Authors
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -196,7 +196,7 @@ thread_state_flavor_t InitializeCPUContextX86Flavor(
     }
 
     default: {
-      NOTREACHED();
+      NOTREACHED_IN_MIGRATION();
       return THREAD_STATE_NONE;
     }
   }
@@ -377,7 +377,7 @@ thread_state_flavor_t InitializeCPUContextX86_64Flavor(
     }
 
     default: {
-      NOTREACHED();
+      NOTREACHED_IN_MIGRATION();
       return THREAD_STATE_NONE;
     }
   }
@@ -553,7 +553,7 @@ thread_state_flavor_t InitializeCPUContextARM64Flavor(
     }
 
     default: {
-      NOTREACHED();
+      NOTREACHED_IN_MIGRATION();
       return THREAD_STATE_NONE;
     }
   }

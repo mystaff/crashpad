@@ -111,6 +111,8 @@ if(LINUX OR ANDROID)
     target_sources(crashpad_snapshot PRIVATE
         posix/timezone.cc
         posix/timezone.h
+        linux/capture_memory_delegate_linux.cc
+        linux/capture_memory_delegate_linux.h
         linux/cpu_context_linux.cc
         linux/cpu_context_linux.h
         linux/debug_rendezvous.cc
@@ -219,6 +221,17 @@ if(WIN32)
     elseif(CMAKE_CXX_COMPILER_ID STREQUAL "Clang")
         target_compile_options(crashpad_snapshot PRIVATE
             "-Wno-unknown-attributes"
+        )
+    endif()
+
+    if (MINGW OR ("${CMAKE_VS_WINDOWS_TARGET_PLATFORM_VERSION}" STREQUAL "") OR (CMAKE_SYSTEM_VERSION LESS 10))
+        # Define NTDDI_VERSION >= NTDDI_WIN10_RS5 - so InitializeContext2 definition is always available in process_reader_win.cc
+        # NTDDI_WIN10_RS5 = 0x0A000006  /* ABRACADABRA_WIN10_RS5 */
+        set_property(
+            SOURCE "win/process_reader_win.cc"
+            APPEND
+            PROPERTY COMPILE_DEFINITIONS
+            WINVER=0x0A00 _WIN32_WINNT=0x0A00 NTDDI_VERSION=0x0A000006
         )
     endif()
 endif()

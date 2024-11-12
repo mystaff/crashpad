@@ -1,4 +1,4 @@
-// Copyright 2021 The Crashpad Authors. All rights reserved.
+// Copyright 2021 The Crashpad Authors
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -17,7 +17,6 @@
 
 #include <vector>
 
-#include "base/macros.h"
 #include "util/ios/ios_intermediate_dump_map.h"
 #include "util/ios/ios_intermediate_dump_object.h"
 
@@ -30,6 +29,10 @@ namespace internal {
 class IOSIntermediateDumpList : public IOSIntermediateDumpObject {
  public:
   IOSIntermediateDumpList();
+
+  IOSIntermediateDumpList(const IOSIntermediateDumpList&) = delete;
+  IOSIntermediateDumpList& operator=(const IOSIntermediateDumpList&) = delete;
+
   ~IOSIntermediateDumpList() override;
 
   // IOSIntermediateDumpObject:
@@ -45,8 +48,6 @@ class IOSIntermediateDumpList : public IOSIntermediateDumpObject {
 
  private:
   VectorType list_;
-
-  DISALLOW_COPY_AND_ASSIGN(IOSIntermediateDumpList);
 };
 
 }  // namespace internal

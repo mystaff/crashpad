@@ -1,4 +1,4 @@
-// Copyright 2014 The Crashpad Authors. All rights reserved.
+// Copyright 2014 The Crashpad Authors
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -43,6 +43,9 @@ class SystemSnapshotMacTest : public testing::Test {
         system_snapshot_() {
   }
 
+  SystemSnapshotMacTest(const SystemSnapshotMacTest&) = delete;
+  SystemSnapshotMacTest& operator=(const SystemSnapshotMacTest&) = delete;
+
   const internal::SystemSnapshotMac& system_snapshot() const {
     return system_snapshot_;
   }
@@ -59,8 +62,6 @@ class SystemSnapshotMacTest : public testing::Test {
   ProcessReaderMac process_reader_;
   timeval snapshot_time_;
   internal::SystemSnapshotMac system_snapshot_;
-
-  DISALLOW_COPY_AND_ASSIGN(SystemSnapshotMacTest);
 };
 
 TEST_F(SystemSnapshotMacTest, GetCPUArchitecture) {

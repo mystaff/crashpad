@@ -104,6 +104,7 @@ add_library(crashpad_util STATIC
     stream/zlib_output_stream.h
     string/split_string.cc
     string/split_string.h
+    synchronization/scoped_spin_guard.h
     synchronization/semaphore.h
     thread/stoppable.h
     thread/thread.cc
@@ -132,11 +133,11 @@ if(NOT WIN32)
         thread/thread_posix.cc
         posix/close_multiple.cc
         posix/close_multiple.h
-        posix/double_fork_and_exec.cc
-        posix/double_fork_and_exec.h
         posix/drop_privileges.cc
         posix/drop_privileges.h
         posix/process_info.h
+        posix/spawn_subprocess.cc
+        posix/spawn_subprocess.h
         posix/symbolic_constants_posix.cc
         posix/symbolic_constants_posix.h
     )
@@ -167,6 +168,7 @@ if(APPLE)
         misc/capture_context_mac.S
         misc/clock_mac.cc
         misc/paths_mac.cc
+        net/http_transport_mac.mm
         synchronization/semaphore_mac.cc
     )
     if(NOT IOS)
@@ -195,7 +197,6 @@ if(APPLE)
             mach/scoped_task_suspend.h
             mach/task_for_pid.cc
             mach/task_for_pid.h
-            net/http_transport_mac.mm
             posix/process_info_mac.cc
             process/process_memory_mac.cc
             process/process_memory_mac.h
@@ -205,6 +206,8 @@ if(APPLE)
             ios/ios_intermediate_dump_data.cc
             ios/ios_intermediate_dump_data.h
             ios/ios_intermediate_dump_format.h
+            ios/ios_intermediate_dump_interface.cc
+            ios/ios_intermediate_dump_interface.h
             ios/ios_intermediate_dump_list.cc
             ios/ios_intermediate_dump_list.h
             ios/ios_intermediate_dump_map.cc
@@ -219,9 +222,21 @@ if(APPLE)
             ios/ios_system_data_collector.mm
             ios/raw_logging.cc
             ios/raw_logging.h
+            ios/scoped_background_task.h
+            ios/scoped_background_task.mm
             ios/scoped_vm_read.cc
             ios/scoped_vm_read.h
-    )
+            ios/scoped_vm_map.cc
+            ios/scoped_vm_map.h
+        )
+        # This specific file requires ARC support, while other parts do not
+        # build when ARC is enabled.
+        set_source_files_properties(
+            ios/scoped_background_task.mm
+            PROPERTIES
+            COMPILE_FLAGS
+            "-fobjc-arc"
+        )
     endif()
 endif()
 
@@ -233,8 +248,23 @@ if(ANDROID)
 endif()
 
 if(LINUX OR ANDROID)
+    if (LINUX)
+        if(NOT TARGET CURL::libcurl) # Some other lib might bring libcurl already
+            find_package(CURL REQUIRED)
+        endif()
+
+        target_link_libraries(crashpad_util PRIVATE CURL::libcurl)
+        SET(HTTP_TRANSPORT_IMPL net/http_transport_libcurl.cc)
+    else()
+        find_package(OpenSSL)
+        if(OPENSSL_FOUND)
+            set(CRASHPAD_USE_BORINGSSL ON)
+        endif()
+        SET(HTTP_TRANSPORT_IMPL net/http_transport_socket.cc)
+    endif()
+    
     target_sources(crashpad_util PRIVATE
-        net/http_transport_socket.cc
+        ${HTTP_TRANSPORT_IMPL}
         linux/address_types.h
         linux/auxiliary_vector.cc
         linux/auxiliary_vector.h
@@ -248,6 +278,8 @@ if(LINUX OR ANDROID)
         linux/exception_information.h
         linux/memory_map.cc
         linux/memory_map.h
+        linux/pac_helper.cc
+        linux/pac_helper.h
         linux/proc_stat_reader.cc
         linux/proc_stat_reader.h
         linux/proc_task_reader.cc
@@ -301,6 +333,7 @@ if(WIN32)
         win/context_wrappers.h
         win/critical_section_with_debug_info.cc
         win/critical_section_with_debug_info.h
+        win/exception_codes.h
         win/exception_handler_server.cc
         win/exception_handler_server.h
         win/get_function.cc
@@ -324,6 +357,7 @@ if(WIN32)
         win/process_structs.h
         win/registration_protocol_win.cc
         win/registration_protocol_win.h
+        win/registration_protocol_win_structs.h
         win/safe_terminate_process.h
         win/scoped_handle.cc
         win/scoped_handle.h
@@ -339,9 +373,23 @@ if(WIN32)
         win/termination_codes.h
         win/traits.h
         win/xp_compat.h
-        misc/capture_context_win.asm
-        win/safe_terminate_process.asm
     )
+    if("${CMAKE_SYSTEM_PROCESSOR}" MATCHES "arm|ARM64")
+        if (MINGW)
+            target_sources(crashpad_util PRIVATE
+                misc/capture_context_win_arm64.S
+            )
+        else()
+            target_sources(crashpad_util PRIVATE
+                misc/capture_context_win_arm64.asm
+            )
+        endif()
+    else()
+        target_sources(crashpad_util PRIVATE
+            misc/capture_context_win.asm
+            win/safe_terminate_process.asm
+        )
+    endif()
 endif()
 
 # Copied from: https://github.com/qedsoftware/crashpad/blob/3583c50a6575857abcf140f6ea3b8d11390205b3/util/CMakeLists.txt#L196-L233
@@ -366,7 +414,7 @@ if(APPLE)
         list(APPEND input_files "${full_path}")
     endforeach()
 
-    find_package(PythonInterp 2.7 REQUIRED)
+    find_package(Python COMPONENTS Interpreter REQUIRED)
 
     set(output_dir "${CMAKE_CURRENT_BINARY_DIR}/util/mach")
     file(MAKE_DIRECTORY "${output_dir}")
@@ -418,7 +466,7 @@ if(APPLE)
             OUTPUT
             ${output_files}
             COMMAND
-            "${PYTHON_EXECUTABLE}" "${CMAKE_CURRENT_SOURCE_DIR}/mach/mig.py" ${archs} ${sdk} ${includes} "${input}" ${output_files}
+            "${Python_EXECUTABLE}" "${CMAKE_CURRENT_SOURCE_DIR}/mach/mig.py" ${archs} ${sdk} ${includes} "${input}" ${output_files}
             DEPENDS
             "${CMAKE_CURRENT_SOURCE_DIR}/mach/mig.py" "${input}"
         )
@@ -459,6 +507,8 @@ if(APPLE)
             "-framework UIKit"
         )
     endif()
+
+    target_compile_options(crashpad_util PRIVATE "-Wno-deprecated-declarations")
 endif()
 
 if(LINUX)
@@ -473,7 +523,12 @@ endif()
 if(WIN32)
     target_link_libraries(crashpad_util PRIVATE user32 version winhttp)
     if(MSVC)
-        target_compile_options(crashpad_util PRIVATE "/wd4201")
+        target_compile_options(crashpad_util PRIVATE
+            $<$<COMPILE_LANGUAGE:C,CXX>:/wd4201> # nonstandard extension used : nameless struct/union.
+        )
+        if(CMAKE_SIZEOF_VOID_P EQUAL 4)
+            set(CMAKE_ASM_MASM_FLAGS "${CMAKE_ASM_MASM_FLAGS} /safeseh")
+        endif()
     elseif(MINGW)
         target_compile_options(crashpad_util PRIVATE
             $<$<COMPILE_LANGUAGE:CXX>:-municode>

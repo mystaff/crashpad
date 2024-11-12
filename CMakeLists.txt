@@ -21,15 +21,14 @@ else()
 endif()
 option(CRASHPAD_ZLIB_SYSTEM "Use system zlib library" "${CRASHPAD_ZLIB_SYSTEM_DEFAULT}")
 
-if(CRASHPAD_ZLIB_SYSTEM)
+if(CRASHPAD_ZLIB_SYSTEM AND NOT TARGET ZLIB::ZLIB)
     find_package(ZLIB REQUIRED)
 endif()
 
-if(LINUX OR ANDROID)
-    find_package(OpenSSL)
-    if(OPENSSL_FOUND)
-        set(CRASHPAD_USE_BORINGSSL ON)
-    endif()
+if (NOT (ANDROID OR FUCHSIA))
+    add_compile_definitions(CRASHPAD_FLOCK_ALWAYS_SUPPORTED=1)
+else()
+    add_compile_definitions(CRASHPAD_FLOCK_ALWAYS_SUPPORTED=0)
 endif()
 
 include(GNUInstallDirs)
@@ -50,9 +49,28 @@ function(crashpad_install_dev)
     endif()
 endfunction()
 
-if(WIN32)
-    enable_language(ASM_MASM)
+if(WIN32 AND NOT (MINGW AND "${CMAKE_SYSTEM_PROCESSOR}" MATCHES "[Aa][Rr][Mm]64"))
+    if("${CMAKE_SYSTEM_PROCESSOR}" MATCHES ARM64)
+        enable_language(ASM_MARMASM)
+    else()
+        enable_language(ASM_MASM)
+    endif()
+
     if(MINGW)
+        find_program(JWASM_FOUND jwasm)
+        if (JWASM_FOUND)
+            set(CMAKE_ASM_MASM_COMPILER ${JWASM_FOUND})
+            execute_process(COMMAND ${CMAKE_C_COMPILER} --version OUTPUT_VARIABLE COMPILER_VERSION_OUTPUT)
+            if (COMPILER_VERSION_OUTPUT)
+                if (COMPILER_VERSION_OUTPUT MATCHES "x86_64")
+                    set(JWASM_FLAGS -win64)
+                else()
+                    set(JWASM_FLAGS -coff)
+                endif()
+            endif()
+           set(CMAKE_ASM_MASM_FLAGS ${CMAKE_ASM_MASM_FLAGS} ${JWASM_FLAGS})
+        endif(JWASM_FOUND)
+
         if(NOT CMAKE_ASM_MASM_COMPILER OR CMAKE_ASM_MASM_COMPILER STREQUAL "ml" OR CMAKE_ASM_MASM_COMPILER STREQUAL "ml64")
             message(WARNING "No custom ASM_MASM compiler defined via 'CMAKE_ASM_MASM_COMPILER'. Trying to use UASM...")
             set(CMAKE_ASM_MASM_COMPILER "uasm")
@@ -60,12 +78,12 @@ if(WIN32)
         if(NOT CMAKE_ASM_MASM_FLAGS)
             set(CMAKE_ASM_MASM_FLAGS "-win64 -10") #use default compatibility flags
         endif()
-    endif()
+   endif(MINGW)
 else()
     enable_language(ASM)
 endif()
 
-set(CMAKE_CXX_STANDARD 14)
+set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
 add_library(crashpad_interface INTERFACE)
@@ -77,7 +95,7 @@ target_compile_definitions(crashpad_interface INTERFACE
     CRASHPAD_LSS_SOURCE_EMBEDDED
 )
 
-if(MSVC)
+if(WIN32)
     target_compile_definitions(crashpad_interface INTERFACE
         NOMINMAX
         UNICODE
@@ -86,13 +104,17 @@ if(MSVC)
         _HAS_EXCEPTIONS=0
         _UNICODE
     )
+endif()
+if(MSVC)
+    set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} /utf-8")
+    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} /utf-8")
+
     string(REGEX REPLACE "/[Ww][0123]" "" CMAKE_C_FLAGS "${CMAKE_C_FLAGS}")
     string(REGEX REPLACE "/[Ww][0123]" "" CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS}")
     target_compile_options(crashpad_interface INTERFACE
         $<$<COMPILE_LANGUAGE:C,CXX>:/FS>
         $<$<COMPILE_LANGUAGE:C,CXX>:/W4>
         $<$<COMPILE_LANGUAGE:C,CXX>:/WX>
-        $<$<COMPILE_LANGUAGE:C,CXX>:/Zi>
         $<$<COMPILE_LANGUAGE:C,CXX>:/bigobj> # Support larger number of sections in obj file.
         $<$<COMPILE_LANGUAGE:C,CXX>:/wd4100> # Unreferenced formal parameter.
         $<$<COMPILE_LANGUAGE:C,CXX>:/wd4127> # Conditional expression is constant.

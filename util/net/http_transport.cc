@@ -1,4 +1,4 @@
-// Copyright 2014 The Crashpad Authors. All rights reserved.
+// Copyright 2014 The Crashpad Authors
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -33,6 +33,10 @@ HTTPTransport::~HTTPTransport() {
 
 void HTTPTransport::SetURL(const std::string& url) {
   url_ = url;
+}
+
+void HTTPTransport::SetHTTPProxy(const std::string& http_proxy) {
+  http_proxy_ = http_proxy;
 }
 
 void HTTPTransport::SetMethod(const std::string& method) {
