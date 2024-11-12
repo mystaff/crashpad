@@ -15,6 +15,7 @@
 #include <chrono>
 #include <memory>
 #include <vector>
+#include <cstring>
 
 #include "base/logging.h"
 
