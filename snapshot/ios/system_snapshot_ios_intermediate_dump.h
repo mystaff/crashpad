@@ -1,4 +1,4 @@
-// Copyright 2020 The Crashpad Authors. All rights reserved.
+// Copyright 2020 The Crashpad Authors
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -19,7 +19,6 @@
 
 #include <string>
 
-#include "base/macros.h"
 #include "snapshot/system_snapshot.h"
 #include "util/ios/ios_intermediate_dump_map.h"
 #include "util/ios/ios_system_data_collector.h"
@@ -33,6 +32,12 @@ namespace internal {
 class SystemSnapshotIOSIntermediateDump final : public SystemSnapshot {
  public:
   SystemSnapshotIOSIntermediateDump();
+
+  SystemSnapshotIOSIntermediateDump(const SystemSnapshotIOSIntermediateDump&) =
+      delete;
+  SystemSnapshotIOSIntermediateDump& operator=(
+      const SystemSnapshotIOSIntermediateDump&) = delete;
+
   ~SystemSnapshotIOSIntermediateDump() override;
 
   //! \brief Initializes the object.
@@ -68,6 +73,11 @@ class SystemSnapshotIOSIntermediateDump final : public SystemSnapshot {
                 int* daylight_offset_seconds,
                 std::string* standard_name,
                 std::string* daylight_name) const override;
+  uint64_t AddressMask() const override;
+
+  //! \brief Returns the number of nanoseconds between Crashpad initialization
+  //!     and snapshot generation.
+  uint64_t CrashpadUptime() const;
 
  private:
   std::string os_version_build_;
@@ -86,9 +96,9 @@ class SystemSnapshotIOSIntermediateDump final : public SystemSnapshot {
   int daylight_offset_seconds_;
   std::string standard_name_;
   std::string daylight_name_;
+  uint64_t address_mask_;
+  uint64_t crashpad_uptime_ns_;
   InitializationStateDcheck initialized_;
-
-  DISALLOW_COPY_AND_ASSIGN(SystemSnapshotIOSIntermediateDump);
 };
 
 }  // namespace internal

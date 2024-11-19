@@ -1,4 +1,4 @@
-// Copyright 2016 The Crashpad Authors. All rights reserved.
+// Copyright 2016 The Crashpad Authors
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -15,7 +15,9 @@
 #include <stdio.h>
 #include <windows.h>
 
-#include "base/cxx17_backports.h"
+#include <iterator>
+
+#include "base/check.h"
 #include "base/debug/alias.h"
 #include "base/logging.h"
 #include "base/notreached.h"
@@ -38,13 +40,13 @@ DWORD WINAPI Thread1(LPVOID context) {
 
   Sleep(INFINITE);
 
-  NOTREACHED();
+  NOTREACHED_IN_MIGRATION();
   return 0;
 }
 
 DWORD WINAPI Thread2(LPVOID dummy) {
   Sleep(INFINITE);
-  NOTREACHED();
+  NOTREACHED_IN_MIGRATION();
   return 0;
 }
 
@@ -63,7 +65,7 @@ DWORD WINAPI Thread3(LPVOID context) {
   if (!FreeLibrary(dll))
     PLOG(FATAL) << "FreeLibrary";
 
-  NOTREACHED();
+  NOTREACHED_IN_MIGRATION();
   return 0;
 }
 
@@ -125,7 +127,7 @@ int wmain(int argc, wchar_t* argv[]) {
 
   // This is not expected to return.
   DWORD count = WaitForMultipleObjects(
-      static_cast<DWORD>(base::size(threads)), threads, true, INFINITE);
+      static_cast<DWORD>(std::size(threads)), threads, true, INFINITE);
   if (count == WAIT_FAILED) {
     PLOG(ERROR) << "WaitForMultipleObjects";
   } else {

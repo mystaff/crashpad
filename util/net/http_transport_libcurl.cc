@@ -1,4 +1,4 @@
-// Copyright 2017 The Crashpad Authors. All rights reserved.
+// Copyright 2017 The Crashpad Authors
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -43,6 +43,9 @@ namespace {
 // as a linkage table for libcurl procedures.
 class Libcurl {
  public:
+  Libcurl(const Libcurl&) = delete;
+  Libcurl& operator=(const Libcurl&) = delete;
+
   static bool Initialized() {
     static bool initialized = Get()->Initialize();
     return initialized;
@@ -155,8 +158,6 @@ class Libcurl {
   NoCfiIcall<decltype(curl_slist_free_all)*> curl_slist_free_all_;
   NoCfiIcall<decltype(curl_slist_append)*> curl_slist_append_;
   NoCfiIcall<decltype(curl_version)*> curl_version_;
-
-  DISALLOW_COPY_AND_ASSIGN(Libcurl);
 };
 
 std::string UserAgent() {
@@ -236,6 +237,8 @@ std::string UserAgent() {
 #elif defined(ARCH_CPU_BIG_ENDIAN)
     static constexpr char arch[] = "aarch64_be";
 #endif
+#elif defined (ARCH_CPU_RISCV64)
+    static constexpr char arch[] = "riscv64";
 #else
 #error Port
 #endif
@@ -271,6 +274,10 @@ using ScopedCURL = base::ScopedGeneric<CURL*, ScopedCURLTraits>;
 class CurlSList {
  public:
   CurlSList() : list_(nullptr) {}
+
+  CurlSList(const CurlSList&) = delete;
+  CurlSList& operator=(const CurlSList&) = delete;
+
   ~CurlSList() {
     if (list_) {
       Libcurl::CurlSlistFreeAll(list_);
@@ -289,13 +296,14 @@ class CurlSList {
 
  private:
   curl_slist* list_;
-
-  DISALLOW_COPY_AND_ASSIGN(CurlSList);
 };
 
 class ScopedClearString {
  public:
   explicit ScopedClearString(std::string* string) : string_(string) {}
+
+  ScopedClearString(const ScopedClearString&) = delete;
+  ScopedClearString& operator=(const ScopedClearString&) = delete;
 
   ~ScopedClearString() {
     if (string_) {
@@ -307,13 +315,15 @@ class ScopedClearString {
 
  private:
   std::string* string_;
-
-  DISALLOW_COPY_AND_ASSIGN(ScopedClearString);
 };
 
 class HTTPTransportLibcurl final : public HTTPTransport {
  public:
   HTTPTransportLibcurl();
+
+  HTTPTransportLibcurl(const HTTPTransportLibcurl&) = delete;
+  HTTPTransportLibcurl& operator=(const HTTPTransportLibcurl&) = delete;
+
   ~HTTPTransportLibcurl() override;
 
   // HTTPTransport:
@@ -328,8 +338,6 @@ class HTTPTransportLibcurl final : public HTTPTransport {
                                   size_t size,
                                   size_t nitems,
                                   void* userdata);
-
-  DISALLOW_COPY_AND_ASSIGN(HTTPTransportLibcurl);
 };
 
 HTTPTransportLibcurl::HTTPTransportLibcurl() : HTTPTransport() {}
@@ -450,6 +458,9 @@ bool HTTPTransportLibcurl::ExecuteSynchronously(std::string* response_body) {
   TRY_CURL_EASY_SETOPT(curl.get(), CURLOPT_READDATA, this);
   TRY_CURL_EASY_SETOPT(curl.get(), CURLOPT_WRITEFUNCTION, WriteResponseBody);
   TRY_CURL_EASY_SETOPT(curl.get(), CURLOPT_WRITEDATA, response_body);
+  if (!http_proxy().empty()) {
+    TRY_CURL_EASY_SETOPT(curl.get(), CURLOPT_PROXY, http_proxy().c_str());
+  }
 
 #undef TRY_CURL_EASY_SETOPT
 #undef TRY_CURL_SLIST_APPEND
@@ -474,7 +485,8 @@ bool HTTPTransportLibcurl::ExecuteSynchronously(std::string* response_body) {
   }
 
   if (status != 200) {
-    LOG(ERROR) << base::StringPrintf("HTTP status %ld", status);
+    LOG(ERROR) << base::StringPrintf(
+        "HTTP status %ld, response = \"%s\"", status, response_body->c_str());
     return false;
   }
 
@@ -516,6 +528,10 @@ size_t HTTPTransportLibcurl::WriteResponseBody(char* buffer,
                                                size_t size,
                                                size_t nitems,
                                                void* userdata) {
+#if defined(MEMORY_SANITIZER)
+  // Work around an MSAN false-positive in passing `userdata`.
+  __msan_unpoison(&userdata, sizeof(userdata));
+#endif
   std::string* response_body = reinterpret_cast<std::string*>(userdata);
 
   // This libcurl callback mimics the silly stdio-style fread() interface: size
