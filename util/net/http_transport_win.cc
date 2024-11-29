@@ -117,7 +117,9 @@ std::string WinHttpMessage(const char* extra) {
 }
 
 struct ScopedHINTERNETTraits {
-  static HINTERNET InvalidValue() { return nullptr; }
+  static HINTERNET InvalidValue() {
+    return nullptr;
+  }
   static void Free(HINTERNET handle) {
     if (handle) {
       if (!WinHttpCloseHandle(handle)) {
@@ -178,9 +180,6 @@ bool HTTPTransportWin::ExecuteSynchronously(std::string* response_body) {
                                       WINHTTP_NO_PROXY_NAME,
                                       WINHTTP_NO_PROXY_BYPASS,
                                       0));
-    }
-  }
-
   if (!session.get()) {
     LOG(ERROR) << WinHttpMessage("WinHttpOpen");
     return false;
@@ -439,7 +438,7 @@ bool HTTPTransportWin::ExecuteSynchronously(std::string* response_body) {
 
 // static
 std::unique_ptr<HTTPTransport> HTTPTransport::Create() {
-  return std::make_unique<HTTPTransportWin>();
+  return std::unique_ptr<HTTPTransportWin>(new HTTPTransportWin);
 }
 
 }  // namespace crashpad
