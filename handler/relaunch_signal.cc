@@ -28,7 +28,7 @@ std::wstring toStdWString(const std::string& str)
     int size = MultiByteToWideChar(CP_UTF8, 0, str.data(), -1, NULL, 0);
     if (size > 0) {
         wcharArr.resize(size);
-        MultiByteToWideChar(CP_UTF8, 0, str.data(), -1, &wcharArr[0], wcharArr.size());
+        MultiByteToWideChar(CP_UTF8, 0, str.data(), -1, &wcharArr[0], (int)wcharArr.size());
         result = std::wstring(&wcharArr[0]);
     }
     return result;
@@ -93,7 +93,7 @@ std::vector<wchar_t*> getRelaunchArgv(const std::string& argvStr,
   auto crashTime = currentTime();
 
   const auto argvWstr = toStdWString(argvStr);
-  std::wistringstream stream(argvStr);
+  std::wistringstream stream(argvWstr);
   std::wstring arg, lastArg;
   bool skipNext = false;
   while (std::getline(stream, arg, L'|')) {
@@ -259,7 +259,7 @@ void RelaunchOnCrash(const std::map<std::string, std::string>& annotations) {
         /*Windows needs some delay to create envelope file to create before restarting the app*/
         Sleep(5000);
         const auto appPathW = toStdWString(appPath->second);
-        auto returnC = _wexecvp(appPath->second.c_str(), cargv.data());
+        auto returnC = _wexecvp(appPathW.c_str(), cargv.data());
 #else
         auto returnC = execvp(appPath->second.c_str(), cargv.data());
 #endif
