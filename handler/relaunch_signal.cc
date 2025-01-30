@@ -89,7 +89,7 @@ std::vector<wchar_t*> getRelaunchArgv(const std::string& argvStr,
                                    const std::string& pidCrashed,
                                    bool& maybeCrashLoop) {
   maybeCrashLoop = false;
-  std::vector<wchar_t*> cargv;
+  std::vector<wchar_t*> wargv;
   auto crashTime = currentTime();
 
   const auto argvWstr = toStdWString(argvStr);
@@ -106,7 +106,7 @@ std::vector<wchar_t*> getRelaunchArgv(const std::string& argvStr,
         // value corruption we create a fresh copy here to prevent that
         wchar_t* carg = new wchar_t[arg.length() + 1];
         wcsncpy(carg, arg.c_str(), arg.length() + 1);
-        cargv.push_back(carg);
+        wargv.push_back(carg);
       }
     } else {
       skipNext = false;
@@ -123,6 +123,27 @@ std::vector<wchar_t*> getRelaunchArgv(const std::string& argvStr,
     }
     lastArg = arg;
   }
+    // Append --crashed-pid and value
+    wchar_t* warg = new wchar_t[crashedPidArg.length() + 1];
+    wcscpy(warg, crashedPidArg.c_str());
+    wargv.push_back(warg);
+
+    warg = new wchar_t[pidCrashed.length() + 1];
+    wcscpy(warg, pidCrashed.c_str());
+    wargv.push_back(warg);
+
+    // Append --crashed-time and value
+    warg = new wchar_t[crashedTimeArg.length() + 1];
+    wcscpy(warg, crashedTimeArg.c_str());
+    wargv.push_back(warg);
+
+    std::wstring crashTimeStr = std::to_wstring(crashTime);
+    warg = new wchar_t[crashTimeStr.length() + 1];
+    wcscpy(warg, crashTimeStr.c_str());
+    wargv.push_back(warg);
+
+    wargv.push_back(nullptr);
+    return wargv;
 }
 void freeRelaunchArgv(std::vector<wchar_t*>& cargv) {
   for (wchar_t* const arg : cargv) {
