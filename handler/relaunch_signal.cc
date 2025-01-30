@@ -19,8 +19,27 @@
 
 #include "base/logging.h"
 
+namespace {
+#if defined(WIN32)
+std::wstring toStdWString(const std::string& str)
+{
+    std::wstring result;
+    std::vector<wchar_t> wcharArr;
+    int size = MultiByteToWideChar(CP_UTF8, 0, str.data(), -1, NULL, 0);
+    if (size > 0) {
+        wcharArr.resize(size);
+        MultiByteToWideChar(CP_UTF8, 0, str.data(), -1, &wcharArr[0], (int)wcharArr.size());
+        result = std::wstring(&wcharArr[0]);
+    }
+    return result;
+}
+const std::wstring crashedPidArg(L"--crashed-pid");
+const std::wstring crashedTimeArg(L"--crashed-time");
+#else
 const std::string crashedPidArg("--crashed-pid");
 const std::string crashedTimeArg("--crashed-time");
+#endif
+
 
 bool crashed = false;
 
@@ -65,6 +84,76 @@ std::string getChildProcessList(const std::string& ppid) {
   return result;
 }
 
+#if defined(WIN32)
+std::vector<wchar_t*> getRelaunchArgv(const std::string& argvStr,
+                                   const std::string& pidCrashed,
+                                   bool& maybeCrashLoop) {
+  maybeCrashLoop = false;
+  std::vector<wchar_t*> wargv;
+  auto crashTime = currentTime();
+
+  const auto argvWstr = toStdWString(argvStr);
+  std::wistringstream stream(argvWstr);
+  std::wstring arg, lastArg;
+  bool skipNext = false;
+  while (std::getline(stream, arg, L'|')) {
+    if (!arg.empty() && !skipNext) {
+      if (arg.compare(crashedPidArg) == 0 || arg.compare(crashedTimeArg) == 0) {
+        // don't pass the --crashed-pid or --crashed-time from prev. crashes
+        skipNext = true;
+      } else {
+        // passing c_str() pointers directly to execv() was causing arg
+        // value corruption we create a fresh copy here to prevent that
+        wchar_t* carg = new wchar_t[arg.length() + 1];
+        wcsncpy(carg, arg.c_str(), arg.length() + 1);
+        wargv.push_back(carg);
+      }
+    } else {
+      skipNext = false;
+      if (lastArg.compare(crashedTimeArg) == 0) {
+        // current arg is the previous crash time
+        // check if the last crash is very recent to prevent crash+relaunch
+        // loops
+        auto lastCrashTime = std::stoll(arg);
+        auto diff = crashTime - lastCrashTime;
+        if (diff < 15000) {
+          maybeCrashLoop = true;
+        }
+      }
+    }
+    lastArg = arg;
+  }
+    // Append --crashed-pid and value
+    wchar_t* warg = new wchar_t[crashedPidArg.length() + 1];
+    wcscpy(warg, crashedPidArg.c_str());
+    wargv.push_back(warg);
+
+    const auto pidCrashedWstr = std::wstring(pidCrashed.begin(), pidCrashed.end());
+    warg = new wchar_t[pidCrashedWstr.length() + 1];
+    wcscpy(warg, pidCrashedWstr.c_str());
+    wargv.push_back(warg);
+
+    // Append --crashed-time and value
+    warg = new wchar_t[crashedTimeArg.length() + 1];
+    wcscpy(warg, crashedTimeArg.c_str());
+    wargv.push_back(warg);
+
+    std::wstring crashTimeStr = std::to_wstring(crashTime);
+    warg = new wchar_t[crashTimeStr.length() + 1];
+    wcscpy(warg, crashTimeStr.c_str());
+    wargv.push_back(warg);
+
+    wargv.push_back(nullptr);
+    return wargv;
+}
+void freeRelaunchArgv(std::vector<wchar_t*>& cargv) {
+  for (wchar_t* const arg : cargv) {
+    if (arg) {
+      delete[] arg;
+    }
+  }
+}
+#else
 std::vector<char*> getRelaunchArgv(const std::string& argvStr,
                                    const std::string& pidCrashed,
                                    bool& maybeCrashLoop) {
@@ -139,6 +228,9 @@ void freeRelaunchArgv(std::vector<char*>& cargv) {
     }
   }
 }
+#endif
+
+}  // namespace
 
 namespace td {
 void SetCrashed() {
@@ -175,7 +267,7 @@ void RelaunchOnCrash(const std::map<std::string, std::string>& annotations) {
       bool hasArgv = appArgv != annotations.end();
       std::string argvStr(hasArgv ? appArgv->second.c_str() : "");
       bool maybeCrashLoop;
-      std::vector<char*> cargv =
+      auto cargv =
           getRelaunchArgv(argvStr, pidCrashed->second, maybeCrashLoop);
 
       LOG(INFO) << "Got __td-relaunch-path and __td-crashed-pid annotations: "
@@ -188,7 +280,8 @@ void RelaunchOnCrash(const std::map<std::string, std::string>& annotations) {
 #if defined(WIN32)
         /*Windows needs some delay to create envelope file to create before restarting the app*/
         Sleep(5000);
-        auto returnC = _execvp(appPath->second.c_str(), cargv.data());
+        const auto appPathW = toStdWString(appPath->second);
+        auto returnC = _wexecvp(appPathW.c_str(), cargv.data());
 #else
         auto returnC = execvp(appPath->second.c_str(), cargv.data());
 #endif
