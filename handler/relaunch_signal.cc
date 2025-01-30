@@ -128,8 +128,9 @@ std::vector<wchar_t*> getRelaunchArgv(const std::string& argvStr,
     wcscpy(warg, crashedPidArg.c_str());
     wargv.push_back(warg);
 
-    warg = new wchar_t[pidCrashed.length() + 1];
-    wcscpy(warg, pidCrashed.c_str());
+    const auto pidCrashedWstr = std::wstring(pidCrashed.begin(), pidCrashed.end());
+    warg = new wchar_t[pidCrashedWstr.length() + 1];
+    wcscpy(warg, pidCrashedWstr.c_str());
     wargv.push_back(warg);
 
     // Append --crashed-time and value
