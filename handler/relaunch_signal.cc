@@ -236,7 +236,7 @@ void KillChildProcesses(const std::string& pid) {
 
 void RelaunchOnCrash(const std::map<std::string, std::string>& annotations) {
   if (crashed) {
-    auto appPath = annotations.find(" ");
+    auto appPath = annotations.find("__td-relaunch-path");
     auto pidCrashed = annotations.find("__td-crashed-pid");
 
     if (appPath != annotations.end() && pidCrashed != annotations.end()) {
@@ -245,7 +245,7 @@ void RelaunchOnCrash(const std::map<std::string, std::string>& annotations) {
       bool hasArgv = appArgv != annotations.end();
       std::string argvStr(hasArgv ? appArgv->second.c_str() : "");
       bool maybeCrashLoop;
-      std::vector<char*> cargv =
+      auto cargv =
           getRelaunchArgv(argvStr, pidCrashed->second, maybeCrashLoop);
 
       LOG(INFO) << "Got __td-relaunch-path and __td-crashed-pid annotations: "
@@ -258,9 +258,7 @@ void RelaunchOnCrash(const std::map<std::string, std::string>& annotations) {
 #if defined(WIN32)
         /*Windows needs some delay to create envelope file to create before restarting the app*/
         Sleep(5000);
-
         const auto appPathW = toStdWString(appPath->second);
-        const auto 
         auto returnC = _wexecvp(appPath->second.c_str(), cargv.data());
 #else
         auto returnC = execvp(appPath->second.c_str(), cargv.data());
